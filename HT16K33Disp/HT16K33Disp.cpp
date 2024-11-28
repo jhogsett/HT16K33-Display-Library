@@ -1,7 +1,5 @@
-//---------------------------------
-// Source File
-// by: Anas Kuzechie (May 03, 2022)
-//---------------------------------
+// some code borrowed from https://github.com/akuzechie/HT16K33-Display-Library
+
 #include <Arduino.h>
 #include "HT16K33Disp.h"
 
@@ -42,18 +40,18 @@ void HT16K33Disp::write(byte digit, unsigned int data){
     Wire.endTransmission();
 }
 
-void HT16K33Disp::segments_test(){
-    for(byte i = 0; i < _num_digits; i++)
-        write(i, (uint16_t) -1);
-}
+// void HT16K33Disp::segments_test(){
+//     for(byte i = 0; i < _num_digits; i++)
+//         write(i, (uint16_t) -1);
+// }
 
-void HT16K33Disp::patterns_test(){
-    for(char c = 33; c < 127; c++){
-        for(byte i = 0; i < _num_digits; i++)
-            write(i, char_to_segments(c));
-        delay(100);
-    }
-}
+// void HT16K33Disp::patterns_test(){
+//     for(char c = 33; c < 127; c++){
+//         for(byte i = 0; i < _num_digits; i++)
+//             write(i, char_to_segments(c));
+//         delay(100);
+//     }
+// }
 
 void HT16K33Disp::clear(){
     for(byte i = 0; i < _num_digits; i++)
@@ -145,19 +143,17 @@ void HT16K33Disp::simple_show_string(char * string){
 
 void HT16K33Disp::scroll_string(char * string, int show_delay = 0, int scroll_delay = 0){
     int frames = begin_scroll_string(string, show_delay, scroll_delay);
-    while(step_scroll_string())
+    while(step_scroll_string(millis()))
         ;
 }
 
 // returns count of frames
 int HT16K33Disp::begin_scroll_string(char * string, int show_delay = 0, int scroll_delay = 0){
     _string = string;
-    _strpos = 0;
+    _scrollpos = 0;
     _show_delay = show_delay ? show_delay : DEFAULT_SHOW_DELAY;
     _scroll_delay = scroll_delay ? scroll_delay : DEFAULT_SCROLL_DELAY;
     int length = string_length(string);
-    // Serial.print("string ");
-    // Serial.println(string);
     _frames = (length - _num_digits) + 1;
     if(_frames < 1)
         _frames = 1;
@@ -167,33 +163,37 @@ int HT16K33Disp::begin_scroll_string(char * string, int show_delay = 0, int scro
     return _frames;
 }
 
-bool HT16K33Disp::step_scroll_string(){
-    unsigned long time = millis();
+bool HT16K33Disp::step_scroll_string(unsigned long time){
+    // unsigned long time = millis();
     if(_frame < _frames){
         if(time > _next_frame){
-            if(_short_string)
+            if(_short_string){
                 show_string(_string, true);
-            else
-            {
-                simple_show_string(_string + _strpos);
+            } else {
+                // show_string(_string + _scrollpos, true);
+                simple_show_string(_string + _scrollpos);
 
                 if(_frame < _frames - 1){
-                    _strpos++;
-                    if(*(_string + _strpos) == '.')
-                        _strpos++;
+                    _scrollpos++;
+
+                    if(*(_string + _scrollpos) == '.')
+                        _scrollpos++;
                 }
             }
-            int del = (_frame == 0) || (_frame == _frames - 1) ? _show_delay : _scroll_delay;
 
+            int del = (_frame == 0) || (_frame == _frames - 1) ? _show_delay : _scroll_delay;
             _next_frame = time + del;
             _frame++;
+
             return true;
         }
     } else if(time < _next_frame){
-        if(_short_string)
+        if(_short_string){
             show_string(_string, true);
-        else
-            simple_show_string(_string + _strpos);
+        } else {
+            simple_show_string(_string + _scrollpos);
+            // show_string(_string + _scrollpos, true);
+        }
         return true;
     } else {
         return false;
@@ -205,60 +205,6 @@ void HT16K33Disp::update_scroll_string(char * string){
     _string = string;
 }
 
-void HT16K33Disp::Char(byte digit, char c1)
-{
-    write(digit, char_to_segments(c1));
-}
-
-void HT16K33Disp::Text(String text1)
-{
-    char text2[5]; uint16_t c2;
-    text1.toCharArray(text2, 5);
-
-    for(byte i=0; i<text1.length(); i++)
-    {
-        c2 = char_to_segments(text2[i]);
-        Wire.beginTransmission(_address);
-        Wire.write(i*2);
-        Wire.write(c2 & 0x00FF);
-        Wire.write((c2 & 0xFF00) >> 8);
-        Wire.endTransmission();
-    }
-}
-
-void HT16K33Disp::Num(byte digit, int n)
-{
-    switch(n)
-    {
-      case 0: Char(digit, '0'); break;
-      case 1: Char(digit, '1'); break;
-      case 2: Char(digit, '2'); break;
-      case 3: Char(digit, '3'); break;
-      case 4: Char(digit, '4'); break;
-      case 5: Char(digit, '5'); break;
-      case 6: Char(digit, '6'); break;
-      case 7: Char(digit, '7'); break;
-      case 8: Char(digit, '8'); break;
-      case 9: Char(digit, '9');
-    }
-}
-
-void HT16K33Disp::Numdp(byte digit, int n)
-{
-    uint16_t c2;
-    c2 = convertdp(n);
-    Wire.beginTransmission(_address);
-    Wire.write(digit*2);
-    Wire.write(c2 & 0x00FF);
-    Wire.write((c2 & 0xFF00) >> 8);
-    Wire.endTransmission();
-}
-
-void HT16K33Disp::Clear()
-{
-    clear();
-}
-
 uint16_t HT16K33Disp::char_to_segments(char c, bool decimal_point = false)
 {
     if(c < 32 || c > 127)
@@ -268,9 +214,4 @@ uint16_t HT16K33Disp::char_to_segments(char c, bool decimal_point = false)
 #else
     return HT16K33Disp_FourteenSegmentASCII[c - 32] | (decimal_point ? DECIMAL_PT_SEGMENT : 0);
 #endif
-}
-
-uint16_t HT16K33Disp::convertdp(int n)
-{
-    return char_to_segments(n + 48) | 0x4000;;
 }

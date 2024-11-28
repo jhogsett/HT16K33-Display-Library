@@ -120,8 +120,8 @@ public:
     HT16K33Disp(byte address = 0x70, byte num_displays = 1);
 
     void write(byte digit, unsigned int data);
-    void segments_test();
-    void patterns_test();
+    // void segments_test();
+    // void patterns_test();
     void clear();
     int string_length(char * string);
     void show_string(char * string, bool pad_blanks = true, bool right_justify = false);
@@ -129,7 +129,7 @@ public:
 
     void scroll_string(char * string, int show_delay = 0, int scroll_delay = 0);
     int begin_scroll_string(char * string, int show_delay = 0, int scroll_delay = 0);
-    bool step_scroll_string();
+    bool step_scroll_string(unsigned long time);
     void update_scroll_string(char * string);
 
     uint16_t char_to_segments(char c, bool decimal_point = false);
@@ -137,10 +137,10 @@ public:
 
     void Init(byte *brightLevels);
     void Clear();
-    void Char(byte digit, char c1);
-    void Text(String text1);
-    void Num(byte digit, int n);
-    void Numdp(byte digit, int n);
+    // void Char(byte digit, char c1);
+    // void Text(String text1);
+    // void Num(byte digit, int n);
+    // void Numdp(byte digit, int n);
 
 private:
     byte _address;
@@ -152,7 +152,7 @@ private:
     int _show_delay;
     int _scroll_delay;
     unsigned long _next_frame;
-    int _strpos;
+    int _scrollpos;
     bool _short_string;
 
     /*
