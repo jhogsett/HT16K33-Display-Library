@@ -3,173 +3,274 @@
 // by: Anas Kuzechie (May 03, 2022)
 //---------------------------------
 #include <Arduino.h>
-#include <HT16K33Disp.h>
-//------------------------------------------------------------
-// Constructor
-//------------------------------------------------------------
-HT16K33Disp::HT16K33Disp() {}
-//------------------------------------------------------------
-// Function prototypes
-//------------------------------------------------------------
-uint16_t convert(char);
-uint16_t convertdp(int);
-//------------------------------------------------------------
-// Methods
-//------------------------------------------------------------
-void HT16K33Disp::Init(byte address, byte brightLevel)
-{
-    Wire.beginTransmission(address);
-    Wire.write(0x21);               //normal operation mode
-    Wire.endTransmission(false);
-    //--------------------------------------------------------
-    Wire.beginTransmission(address);
-    Wire.write(0xE0+brightLevel);   //brightness level
-    Wire.endTransmission(false);
-    //--------------------------------------------------------
-    Wire.beginTransmission(address);
-    Wire.write(0x81);               //display ON, blinking OFF
-    Wire.endTransmission();
+#include "HT16K33Disp.h"
+
+#define DEFAULT_ADDRESS 0x70
+#define DEFAULT_NUM_DISPLAYS 1
+#define DECIMAL_PT_SEGMENT 0x4000
+
+#define NUM_DIGITS_PER_DISPLAY 4
+
+HT16K33Disp::HT16K33Disp(byte address = DEFAULT_ADDRESS, byte num_displays = 1){
+    _address = address;
+    _num_displays = num_displays;
+    _num_digits = _num_displays * NUM_DIGITS_PER_DISPLAY;
 }
-//------------------------------------------------------------
-void HT16K33Disp::Char(byte address, byte digit, char c1)
-{
-    uint16_t c2; 
-    c2 = convert(c1);
-    //------------------------------
-    Wire.beginTransmission(address);
+
+// point to an array of bytes specifying brightness levels per display
+void HT16K33Disp::Init(byte *brightLevels){
+    for(byte i = 0; i < _num_displays; i++){
+        Wire.beginTransmission(_address + i);
+        Wire.write(0x21);               //normal operation mode
+        Wire.endTransmission(false);
+        Wire.beginTransmission(_address + i);
+        Wire.write(0xE0 + *(brightLevels + i));
+        Wire.endTransmission(false);
+        Wire.beginTransmission(_address + i);
+        Wire.write(0x81);               //display ON, blinking OFF
+        Wire.endTransmission();
+    }
+}
+
+void HT16K33Disp::write(byte digit, unsigned int data){
+    byte display = digit / NUM_DIGITS_PER_DISPLAY;
+    digit -= (display * NUM_DIGITS_PER_DISPLAY);
+    Wire.beginTransmission(_address + display);
     Wire.write(digit*2);
-    Wire.write(c2 & 0x00FF);
-    Wire.write((c2 & 0xFF00) >> 8);
+    Wire.write(data);
+    Wire.write(data >> 8);
     Wire.endTransmission();
 }
-//------------------------------------------------------------
-void HT16K33Disp::Text(byte address, String text1)
+
+void HT16K33Disp::segments_test(){
+    for(byte i = 0; i < _num_digits; i++)
+        write(i, (uint16_t) -1);
+}
+
+void HT16K33Disp::patterns_test(){
+    for(char c = 33; c < 127; c++){
+        for(byte i = 0; i < _num_digits; i++)
+            write(i, char_to_segments(c));
+        delay(100);
+    }
+}
+
+void HT16K33Disp::clear(){
+    for(byte i = 0; i < _num_digits; i++)
+        write(i, 0);
+}
+
+// determine the displayable length of the string
+// taking decimal points into account
+int HT16K33Disp::string_length(char * string){
+    int count = 0;
+    int num_chars = strlen(string);
+    for(byte i = 0; i <= num_chars; i++){
+        if(*string == 0)
+            break;
+        // period chars won't take up a digit position when displayed
+        if(*(string + 1) == '.')
+            string++;
+        string++;
+        count++;
+    }
+    return count;
+}
+
+
+void HT16K33Disp::show_string(char * string, bool pad_blanks = true, bool right_justify = false){
+    byte i = 0;
+    if(right_justify){
+        char diff = _num_digits - string_length(string);
+        if(pad_blanks){
+            if(diff > 0){
+                for(i = 0; i < diff; i++){
+                    write(i, char_to_segments(' '));
+                }
+            }
+        } else {
+            i = diff;
+        }
+    }
+
+    for(byte j = i; j < _num_digits; j++){
+        if(*string == 0){
+            if(pad_blanks && !right_justify)
+                write(j, char_to_segments(' '));
+            else
+                break;
+        } else {
+            if(*(string + 1) == '.'){
+                // take the next char and just light this positions DP LED
+                write(j, char_to_segments(*string, true));
+                string++;
+
+            // // if the current char is followed by a period
+            // if(*(string + 1) == '.'){
+            //     // and if the current char is not a period
+            //     if(*string != '.'){
+            //         // take the next char and just light this positions DP LED
+            //         write(j, char_to_segments(*string, true));
+            //         string++;
+            //     } else {
+            //         // else if the current char is a period, just treat this
+            //         // as an orginary character, taking up a character position
+            //         write(j, char_to_segments(*string));
+            //     }
+
+            } else {
+                write(j, char_to_segments(*string));
+            }
+            string++;
+        }
+    }
+}
+
+void HT16K33Disp::simple_show_string(char * string){
+    byte i = 0;
+    for(byte j = i; j < _num_digits; j++){
+        if(*string == 0){
+            break;
+        } else {
+            if(*(string + 1) == '.'){
+                write(j, char_to_segments(*string, true));
+                string++;
+            } else {
+                write(j, char_to_segments(*string));
+            }
+            string++;
+        }
+    }
+}
+
+void HT16K33Disp::scroll_string(char * string, int show_delay = 0, int scroll_delay = 0){
+    int frames = begin_scroll_string(string, show_delay, scroll_delay);
+    while(step_scroll_string())
+        ;
+}
+
+// returns count of frames
+int HT16K33Disp::begin_scroll_string(char * string, int show_delay = 0, int scroll_delay = 0){
+    _string = string;
+    _strpos = 0;
+    _show_delay = show_delay ? show_delay : DEFAULT_SHOW_DELAY;
+    _scroll_delay = scroll_delay ? scroll_delay : DEFAULT_SCROLL_DELAY;
+    int length = string_length(string);
+    // Serial.print("string ");
+    // Serial.println(string);
+    _frames = (length - _num_digits) + 1;
+    if(_frames < 1)
+        _frames = 1;
+    _frame = 0;
+    _next_frame = 0;
+    _short_string = length <= _num_digits;
+    return _frames;
+}
+
+bool HT16K33Disp::step_scroll_string(){
+    unsigned long time = millis();
+    if(_frame < _frames){
+        if(time > _next_frame){
+            if(_short_string)
+                show_string(_string, true);
+            else
+            {
+                simple_show_string(_string + _strpos);
+
+                if(_frame < _frames - 1){
+                    _strpos++;
+                    if(*(_string + _strpos) == '.')
+                        _strpos++;
+                }
+            }
+            int del = (_frame == 0) || (_frame == _frames - 1) ? _show_delay : _scroll_delay;
+
+            _next_frame = time + del;
+            _frame++;
+            return true;
+        }
+    } else if(time < _next_frame){
+        if(_short_string)
+            show_string(_string, true);
+        else
+            simple_show_string(_string + _strpos);
+        return true;
+    } else {
+        return false;
+    }
+}
+
+// incoming string must be the same size as the original scroll string
+void HT16K33Disp::update_scroll_string(char * string){
+    _string = string;
+}
+
+void HT16K33Disp::Char(byte digit, char c1)
+{
+    write(digit, char_to_segments(c1));
+}
+
+void HT16K33Disp::Text(String text1)
 {
     char text2[5]; uint16_t c2;
     text1.toCharArray(text2, 5);
-    
+
     for(byte i=0; i<text1.length(); i++)
     {
-        c2 = convert(text2[i]);
-        //------------------------------
-        Wire.beginTransmission(address);
+        c2 = char_to_segments(text2[i]);
+        Wire.beginTransmission(_address);
         Wire.write(i*2);
         Wire.write(c2 & 0x00FF);
         Wire.write((c2 & 0xFF00) >> 8);
         Wire.endTransmission();
-        delay(100);
-    } 
+    }
 }
-//------------------------------------------------------------
-void HT16K33Disp::Num(byte address, byte digit, int n)
+
+void HT16K33Disp::Num(byte digit, int n)
 {
     switch(n)
     {
-      case 0: Char(address, digit, '0'); break;
-      case 1: Char(address, digit, '1'); break;
-      case 2: Char(address, digit, '2'); break;
-      case 3: Char(address, digit, '3'); break;
-      case 4: Char(address, digit, '4'); break;
-      case 5: Char(address, digit, '5'); break;
-      case 6: Char(address, digit, '6'); break;
-      case 7: Char(address, digit, '7'); break;
-      case 8: Char(address, digit, '8'); break;
-      case 9: Char(address, digit, '9');
+      case 0: Char(digit, '0'); break;
+      case 1: Char(digit, '1'); break;
+      case 2: Char(digit, '2'); break;
+      case 3: Char(digit, '3'); break;
+      case 4: Char(digit, '4'); break;
+      case 5: Char(digit, '5'); break;
+      case 6: Char(digit, '6'); break;
+      case 7: Char(digit, '7'); break;
+      case 8: Char(digit, '8'); break;
+      case 9: Char(digit, '9');
     }
 }
-//------------------------------------------------------------
-void HT16K33Disp::Numdp(byte address, byte digit, int n)
+
+void HT16K33Disp::Numdp(byte digit, int n)
 {
-    uint16_t c2;   
+    uint16_t c2;
     c2 = convertdp(n);
-    //------------------------------
-    Wire.beginTransmission(address);
+    Wire.beginTransmission(_address);
     Wire.write(digit*2);
     Wire.write(c2 & 0x00FF);
     Wire.write((c2 & 0xFF00) >> 8);
     Wire.endTransmission();
 }
-//------------------------------------------------------------
-void HT16K33Disp::Clear(byte address)
+
+void HT16K33Disp::Clear()
 {
-    for(byte i=0; i<=3; i++) Char(address, i, ' ');
+    clear();
 }
-//------------------------------------------------------------
-// Functions
-//------------------------------------------------------------
-uint16_t convert(char c)
+
+uint16_t HT16K33Disp::char_to_segments(char c, bool decimal_point = false)
 {
-    uint16_t c2;
-    switch(c)
-    {
-        case ' ': c2 = 0x0000; break;
-        case '.': c2 = 0x4000; break;
-        case '+': c2 = 0x12C0; break;
-        case '-': c2 = 0x00C0; break;
-        case '*': c2 = 0x3FC0; break;
-        case '/': c2 = 0x0C00; break;
-        case '=': c2 = 0x00C8; break;
-        case '>': c2 = 0x0900; break;
-        case '<': c2 = 0x2400; break;
-        case '[': c2 = 0x0039; break;
-        case ']': c2 = 0x000F; break;
-        //---------------------------
-        case '0': c2 = 0x0C3F; break;
-        case '1': c2 = 0x0406; break;
-        case '2': c2 = 0x00DB; break;
-        case '3': c2 = 0x008F; break;
-        case '4': c2 = 0x00E6; break;
-        case '5': c2 = 0x00ED; break;
-        case '6': c2 = 0x00FD; break;
-        case '7': c2 = 0x0007; break;
-        case '8': c2 = 0x00FF; break;
-        case '9': c2 = 0x00EF; break;
-        //---------------------------
-        case 'A': c2 = 0x00F7; break;
-        case 'B': c2 = 0x128F; break;
-        case 'C': c2 = 0x0039; break;
-        case 'D': c2 = 0x120F; break;
-        case 'E': c2 = 0x00F9; break;
-        case 'F': c2 = 0x00F1; break;
-        case 'G': c2 = 0x00BD; break;
-        case 'H': c2 = 0x00F6; break;
-        case 'I': c2 = 0x1209; break;
-        case 'J': c2 = 0x001E; break;
-        case 'K': c2 = 0x2470; break;
-        case 'L': c2 = 0x0038; break;
-        case 'M': c2 = 0x0536; break;
-        case 'N': c2 = 0x2136; break;
-        case 'O': c2 = 0x003F; break;
-        case 'P': c2 = 0x00F3; break;
-        case 'Q': c2 = 0x203F; break;
-        case 'R': c2 = 0x20F3; break;
-        case 'S': c2 = 0x018D; break;
-        case 'T': c2 = 0x1201; break;
-        case 'U': c2 = 0x003E; break;
-        case 'V': c2 = 0x0C30; break;
-        case 'W': c2 = 0x2836; break;
-        case 'X': c2 = 0x2D00; break;
-        case 'Y': c2 = 0x1500; break;
-        case 'Z': c2 = 0x0C09;
-    }
-    return c2;
+    if(c < 32 || c > 127)
+        return (uint16_t) -1;
+#ifdef HT16K33Disp_USEPROGMEM
+    return pgm_read_dword(&HT16K33Disp_FourteenSegmentASCII[c - 32]) | (decimal_point ? DECIMAL_PT_SEGMENT : 0);
+#else
+    return HT16K33Disp_FourteenSegmentASCII[c - 32] | (decimal_point ? DECIMAL_PT_SEGMENT : 0);
+#endif
 }
-//------------------------------------------------------------
-uint16_t convertdp(int n)
+
+uint16_t HT16K33Disp::convertdp(int n)
 {
-    uint16_t c2;
-    switch(n)
-    {
-        case 0: c2 = 0x0C3F|0x4000; break;
-        case 1: c2 = 0x0406|0x4000; break;
-        case 2: c2 = 0x00DB|0x4000; break;
-        case 3: c2 = 0x008F|0x4000; break;
-        case 4: c2 = 0x00E6|0x4000; break;
-        case 5: c2 = 0x00ED|0x4000; break;
-        case 6: c2 = 0x00FD|0x4000; break;
-        case 7: c2 = 0x0007|0x4000; break;
-        case 8: c2 = 0x00FF|0x4000; break;
-        case 9: c2 = 0x00EF|0x4000;
-    }
-    return c2;
+    return char_to_segments(n + 48) | 0x4000;;
 }
