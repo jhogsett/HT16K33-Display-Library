@@ -3,13 +3,11 @@
 #include <Arduino.h>
 #include "HT16K33Disp.h"
 
-#define DEFAULT_ADDRESS 0x70
-#define DEFAULT_NUM_DISPLAYS 1
-#define DECIMAL_PT_SEGMENT 0x4000
+HT16K33Disp::HT16K33Disp(byte address = 0, byte num_displays = 1){
+    set_address(address, num_displays);
+}
 
-#define NUM_DIGITS_PER_DISPLAY 4
-
-HT16K33Disp::HT16K33Disp(byte address = DEFAULT_ADDRESS, byte num_displays = 1){
+void HT16K33Disp::set_address(byte address, byte num_displays){
     _address = address;
     _num_displays = num_displays;
     _num_digits = _num_displays * NUM_DIGITS_PER_DISPLAY;
@@ -27,6 +25,10 @@ void HT16K33Disp::Init(byte *brightLevels){
         Wire.beginTransmission(_address + i);
         Wire.write(0x81);               //display ON, blinking OFF
         Wire.endTransmission();
+
+        // segments_test();
+        // delay(SEGMENT_TEST_DELAY);
+        clear();
     }
 }
 
@@ -125,26 +127,27 @@ void HT16K33Disp::show_string(char * string, bool pad_blanks = true, bool right_
 }
 
 void HT16K33Disp::simple_show_string(char * string){
-    byte i = 0;
-    for(byte j = i; j < _num_digits; j++){
-        if(*string == 0){
+    for(byte i = 0; i < _num_digits; i++){
+        if(*string == 0)
             break;
-        } else {
-            if(*(string + 1) == '.'){
-                write(j, char_to_segments(*string, true));
-                string++;
-            } else {
-                write(j, char_to_segments(*string));
-            }
+        if(*(string + 1) == '.'){
+            write(i, char_to_segments(*string, true));
             string++;
+        } else {
+            write(i, char_to_segments(*string));
         }
+        string++;
     }
 }
 
 void HT16K33Disp::scroll_string(char * string, int show_delay = 0, int scroll_delay = 0){
+    char *old_string = _string;
     int frames = begin_scroll_string(string, show_delay, scroll_delay);
+
     while(step_scroll_string(millis()))
         ;
+
+    _string = old_string;
 }
 
 // returns count of frames
@@ -164,46 +167,76 @@ int HT16K33Disp::begin_scroll_string(char * string, int show_delay = 0, int scro
 }
 
 bool HT16K33Disp::step_scroll_string(unsigned long time){
-    // unsigned long time = millis();
-    if(_frame < _frames){
-        if(time > _next_frame){
-            if(_short_string){
-                show_string(_string, true);
-            } else {
-                // show_string(_string + _scrollpos, true);
-                simple_show_string(_string + _scrollpos);
+    if(time >= _next_frame){
 
-                if(_frame < _frames - 1){
-                    _scrollpos++;
-
-                    if(*(_string + _scrollpos) == '.')
-                        _scrollpos++;
-                }
-            }
-
-            int del = (_frame == 0) || (_frame == _frames - 1) ? _show_delay : _scroll_delay;
-            _next_frame = time + del;
-            _frame++;
-
-            return true;
-        }
-    } else if(time < _next_frame){
         if(_short_string){
             show_string(_string, true);
         } else {
             simple_show_string(_string + _scrollpos);
-            // show_string(_string + _scrollpos, true);
         }
-        return true;
+
+        if(_frame < _frames - 1){
+            _scrollpos++;
+
+            if(*(_string + _scrollpos) == '.')
+                _scrollpos++;
+        }
+
+        int del = (_frame == 0) || (_frame == _frames - 1) ? _show_delay : _scroll_delay;
+        _next_frame = time + del;
+
+        if(_frame < _frames){
+            _frame++;
+            return true;
+        } else {
+            return false;
+        }
+
     } else {
-        return false;
+        return true;
     }
 }
 
-// incoming string must be the same size as the original scroll string
-void HT16K33Disp::update_scroll_string(char * string){
-    _string = string;
-}
+// bool HT16K33Disp::step_scroll_string(unsigned long time){
+//     if(_frame < _frames){
+//         if(time > _next_frame){
+//             if(_short_string){
+//                 show_string(_string, true);
+//             } else {
+//                 // show_string(_string + _scrollpos, true);
+//                 simple_show_string(_string + _scrollpos);
+
+//                 if(_frame < _frames - 1){
+//                     _scrollpos++;
+
+//                     if(*(_string + _scrollpos) == '.')
+//                         _scrollpos++;
+//                 }
+//             }
+
+//             int del = (_frame == 0) || (_frame == _frames - 1) ? _show_delay : _scroll_delay;
+//             _next_frame = time + del;
+//             _frame++;
+
+//             return true;
+//         }
+//     } else if(time < _next_frame){
+//         if(_short_string){
+//             show_string(_string, true);
+//         } else {
+//             simple_show_string(_string + _scrollpos);
+//             // show_string(_string + _scrollpos, true);
+//         }
+//         return true;
+//     } else {
+//         return false;
+//     }
+// }
+
+// // incoming string must be the same size as the original scroll string
+// void HT16K33Disp::update_scroll_string(char * string){
+//     _string = string;
+// }
 
 uint16_t HT16K33Disp::char_to_segments(char c, bool decimal_point = false)
 {

@@ -1,12 +1,18 @@
+#ifndef HT16K33Disp_h
+#define HT16K33Disp_h
 // some code borrowed from https://github.com/akuzechie/HT16K33-Display-Library
 
 #include <Wire.h>
 
-#ifndef HT16K33Disp_h
-#define HT16K33Disp_h
+#define DEFAULT_ADDRESS_ 0x70
+#define DEFAULT_NUM_DISPLAYS 1
+#define DECIMAL_PT_SEGMENT 0x4000
+
+#define NUM_DIGITS_PER_DISPLAY 4
 
 #define DEFAULT_SHOW_DELAY 750
 #define DEFAULT_SCROLL_DELAY 200
+#define SEGMENT_TEST_DELAY 10
 
 #define HT16K33Disp_USEPROGMEM
 
@@ -116,8 +122,8 @@ const uint16_t HT16K33Disp_FourteenSegmentASCII[96] = {
 class HT16K33Disp
 {
 public:
-
-    HT16K33Disp(byte address = 0x70, byte num_displays = 1);
+    HT16K33Disp(byte address = 0, byte num_displays = 1);
+    void set_address(byte address, byte num_displays);
 
     void write(byte digit, unsigned int data);
     // void segments_test();
@@ -130,7 +136,7 @@ public:
     void scroll_string(char * string, int show_delay = 0, int scroll_delay = 0);
     int begin_scroll_string(char * string, int show_delay = 0, int scroll_delay = 0);
     bool step_scroll_string(unsigned long time);
-    void update_scroll_string(char * string);
+    // void update_scroll_string(char * string);
 
     uint16_t char_to_segments(char c, bool decimal_point = false);
     uint16_t convertdp(int);
@@ -141,6 +147,8 @@ public:
     // void Text(String text1);
     // void Num(byte digit, int n);
     // void Numdp(byte digit, int n);
+
+    static const byte DEFAULT_ADDRESS = DEFAULT_ADDRESS_;
 
 private:
     byte _address;
