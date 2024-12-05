@@ -136,8 +136,8 @@ public:
     int begin_scroll_string(char * string, int show_delay = 0, int scroll_delay = 0);
     bool step_scroll_string(unsigned long time);
 
-    void begin_scroll_loop();
-    void loop_scroll_string(unsigned long time, char * string, int show_delay = 0, int scroll_delay = 0);
+    void begin_scroll_loop(int times=-1);
+    bool loop_scroll_string(unsigned long time, char * string, int show_delay = 0, int scroll_delay = 0);
 
     uint16_t char_to_segments(char c, bool decimal_point = false);
     uint16_t convertdp(int);
@@ -159,6 +159,7 @@ private:
     int _scrollpos;
     bool _short_string;
     bool _loop_running;
+    int _loop_times;
 
     /*
     *  Project     Segmented LED Display - ASCII Library

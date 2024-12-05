@@ -190,14 +190,24 @@ bool HT16K33Disp::step_scroll_string(unsigned long time){
     }
 }
 
-void HT16K33Disp::begin_scroll_loop(){
+// -1=loop forever
+void HT16K33Disp::begin_scroll_loop(int times=-1){
     _loop_running = false;
+    _loop_times = times;
 }
 
-void HT16K33Disp::loop_scroll_string(unsigned long time, char * string, int show_delay = 0, int scroll_delay = 0){
-    if(!_loop_running)
-        begin_scroll_string(string, show_delay, scroll_delay);
+// returns true if there's more loops to go
+bool HT16K33Disp::loop_scroll_string(unsigned long time, char * string, int show_delay = 0, int scroll_delay = 0){
+    if(!_loop_running){
+        if(_loop_times == 0)
+            return false;
+        if(_loop_times == -1 || _loop_times > 0)
+            begin_scroll_string(string, show_delay, scroll_delay);
+        if(_loop_times > 0)
+            _loop_times--;
+    }
     _loop_running = step_scroll_string(time);
+    return true;
 }
 
 uint16_t HT16K33Disp::char_to_segments(char c, bool decimal_point = false){
