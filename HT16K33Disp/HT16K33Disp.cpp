@@ -5,6 +5,7 @@
 
 HT16K33Disp::HT16K33Disp(byte address = 0, byte num_displays = 1){
     set_address(address, num_displays);
+    _loop_running = false;
 }
 
 void HT16K33Disp::set_address(byte address, byte num_displays){
@@ -14,7 +15,7 @@ void HT16K33Disp::set_address(byte address, byte num_displays){
 }
 
 // point to an array of bytes specifying brightness levels per display
-void HT16K33Disp::Init(byte *brightLevels){
+void HT16K33Disp::init(byte *brightLevels){
     for(byte i = 0; i < _num_displays; i++){
         Wire.beginTransmission(_address + i);
         Wire.write(0x21);               //normal operation mode
@@ -45,14 +46,6 @@ void HT16K33Disp::write(byte digit, unsigned int data){
 // void HT16K33Disp::segments_test(){
 //     for(byte i = 0; i < _num_digits; i++)
 //         write(i, (uint16_t) -1);
-// }
-
-// void HT16K33Disp::patterns_test(){
-//     for(char c = 33; c < 127; c++){
-//         for(byte i = 0; i < _num_digits; i++)
-//             write(i, char_to_segments(c));
-//         delay(100);
-//     }
 // }
 
 void HT16K33Disp::clear(){
@@ -197,49 +190,17 @@ bool HT16K33Disp::step_scroll_string(unsigned long time){
     }
 }
 
-// bool HT16K33Disp::step_scroll_string(unsigned long time){
-//     if(_frame < _frames){
-//         if(time > _next_frame){
-//             if(_short_string){
-//                 show_string(_string, true);
-//             } else {
-//                 // show_string(_string + _scrollpos, true);
-//                 simple_show_string(_string + _scrollpos);
+void HT16K33Disp::begin_scroll_loop(){
+    _loop_running = false;
+}
 
-//                 if(_frame < _frames - 1){
-//                     _scrollpos++;
+void HT16K33Disp::loop_scroll_string(unsigned long time, char * string, int show_delay = 0, int scroll_delay = 0){
+    if(!_loop_running)
+        begin_scroll_string(string, show_delay, scroll_delay);
+    _loop_running = step_scroll_string(time);
+}
 
-//                     if(*(_string + _scrollpos) == '.')
-//                         _scrollpos++;
-//                 }
-//             }
-
-//             int del = (_frame == 0) || (_frame == _frames - 1) ? _show_delay : _scroll_delay;
-//             _next_frame = time + del;
-//             _frame++;
-
-//             return true;
-//         }
-//     } else if(time < _next_frame){
-//         if(_short_string){
-//             show_string(_string, true);
-//         } else {
-//             simple_show_string(_string + _scrollpos);
-//             // show_string(_string + _scrollpos, true);
-//         }
-//         return true;
-//     } else {
-//         return false;
-//     }
-// }
-
-// // incoming string must be the same size as the original scroll string
-// void HT16K33Disp::update_scroll_string(char * string){
-//     _string = string;
-// }
-
-uint16_t HT16K33Disp::char_to_segments(char c, bool decimal_point = false)
-{
+uint16_t HT16K33Disp::char_to_segments(char c, bool decimal_point = false){
     if(c < 32 || c > 127)
         return (uint16_t) -1;
 #ifdef HT16K33Disp_USEPROGMEM

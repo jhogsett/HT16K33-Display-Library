@@ -127,7 +127,6 @@ public:
 
     void write(byte digit, unsigned int data);
     // void segments_test();
-    // void patterns_test();
     void clear();
     int string_length(char * string);
     void show_string(char * string, bool pad_blanks = true, bool right_justify = false);
@@ -136,17 +135,14 @@ public:
     void scroll_string(char * string, int show_delay = 0, int scroll_delay = 0);
     int begin_scroll_string(char * string, int show_delay = 0, int scroll_delay = 0);
     bool step_scroll_string(unsigned long time);
-    // void update_scroll_string(char * string);
+
+    void begin_scroll_loop();
+    void loop_scroll_string(unsigned long time, char * string, int show_delay = 0, int scroll_delay = 0);
 
     uint16_t char_to_segments(char c, bool decimal_point = false);
     uint16_t convertdp(int);
 
-    void Init(byte *brightLevels);
-    void Clear();
-    // void Char(byte digit, char c1);
-    // void Text(String text1);
-    // void Num(byte digit, int n);
-    // void Numdp(byte digit, int n);
+    void init(byte *brightLevels);
 
     static const byte DEFAULT_ADDRESS = DEFAULT_ADDRESS_;
 
@@ -162,6 +158,7 @@ private:
     unsigned long _next_frame;
     int _scrollpos;
     bool _short_string;
+    bool _loop_running;
 
     /*
     *  Project     Segmented LED Display - ASCII Library
