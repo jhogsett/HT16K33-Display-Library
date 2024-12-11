@@ -126,7 +126,7 @@ public:
     void set_address(byte address, byte num_displays);
 
     void write(byte digit, unsigned int data);
-    // void segments_test();
+    void segments_test();
     void clear();
     int string_length(char * string);
     void show_string(char * string, bool pad_blanks = true, bool right_justify = false);

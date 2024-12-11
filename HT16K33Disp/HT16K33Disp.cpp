@@ -26,9 +26,6 @@ void HT16K33Disp::init(byte *brightLevels){
         Wire.beginTransmission(_address + i);
         Wire.write(0x81);               //display ON, blinking OFF
         Wire.endTransmission();
-
-        // segments_test();
-        // delay(SEGMENT_TEST_DELAY);
         clear();
     }
 }
@@ -43,12 +40,10 @@ void HT16K33Disp::write(byte digit, unsigned int data){
     Wire.endTransmission();
 }
 
-// void HT16K33Disp::segments_test(){
-//     for(byte i = 0; i < _num_digits; i++){
-//         write(i, (uint16_t) -1);
-//         // write(_num_digits-i, (uint16_t) -1);
-//     }
-// }
+void HT16K33Disp::segments_test(){
+    for(byte i = 0; i < _num_digits; i++)
+        write(i, (uint16_t) -1);
+}
 
 void HT16K33Disp::clear(){
     for(byte i = 0; i < _num_digits; i++)
@@ -72,50 +67,41 @@ int HT16K33Disp::string_length(char * string){
     return count;
 }
 
-
 void HT16K33Disp::show_string(char * string, bool pad_blanks = true, bool right_justify = false){
     byte i = 0;
-    if(right_justify){
+    if(right_justify)
+    {
         char diff = _num_digits - string_length(string);
-        if(pad_blanks){
+        if(pad_blanks)
+        {
             if(diff > 0){
-                for(i = 0; i < diff; i++){
+                for(i = 0; i < diff; i++)
                     write(i, char_to_segments(' '));
-                }
             }
-        } else {
-            i = diff;
         }
+        else
+            i = diff;
     }
 
-    for(byte j = i; j < _num_digits; j++){
-        if(*string == 0){
+    for(byte j = i; j < _num_digits; j++)
+    {
+        if(*string == 0)
+        {
             if(pad_blanks && !right_justify)
                 write(j, char_to_segments(' '));
             else
                 break;
-        } else {
-            if(*(string + 1) == '.'){
+        }
+        else
+        {
+            if(*(string + 1) == '.')
+            {
                 // take the next char and just light this positions DP LED
                 write(j, char_to_segments(*string, true));
                 string++;
-
-            // // if the current char is followed by a period
-            // if(*(string + 1) == '.'){
-            //     // and if the current char is not a period
-            //     if(*string != '.'){
-            //         // take the next char and just light this positions DP LED
-            //         write(j, char_to_segments(*string, true));
-            //         string++;
-            //     } else {
-            //         // else if the current char is a period, just treat this
-            //         // as an orginary character, taking up a character position
-            //         write(j, char_to_segments(*string));
-            //     }
-
-            } else {
-                write(j, char_to_segments(*string));
             }
+            else
+                write(j, char_to_segments(*string));
             string++;
         }
     }
@@ -125,23 +111,22 @@ void HT16K33Disp::simple_show_string(char * string){
     for(byte i = 0; i < _num_digits; i++){
         if(*string == 0)
             break;
-        if(*(string + 1) == '.'){
+        if(*(string + 1) == '.')
+        {
             write(i, char_to_segments(*string, true));
             string++;
-        } else {
-            write(i, char_to_segments(*string));
         }
+        else
+            write(i, char_to_segments(*string));
         string++;
     }
 }
 
+// save and restore string in case this is used along with a non-blocking scroll
 void HT16K33Disp::scroll_string(char * string, int show_delay = 0, int scroll_delay = 0){
     char *old_string = _string;
     int frames = begin_scroll_string(string, show_delay, scroll_delay);
-
-    while(step_scroll_string(millis()))
-        ;
-
+    while(step_scroll_string(millis()));
     _string = old_string;
 }
 
@@ -162,11 +147,12 @@ int HT16K33Disp::begin_scroll_string(char * string, int show_delay = 0, int scro
 }
 
 bool HT16K33Disp::step_scroll_string(unsigned long time){
-    if(time >= _next_frame){
-
-        if(_short_string){
+    if(time >= _next_frame)
+    {
+        if(_short_string)
             show_string(_string, true);
-        } else {
+        else
+        {
             simple_show_string(_string + _scrollpos);
 
             if(_frame < _frames - 1){
@@ -180,14 +166,16 @@ bool HT16K33Disp::step_scroll_string(unsigned long time){
         int del = (_frame == 0) || (_frame == _frames - 1) ? _show_delay : _scroll_delay;
         _next_frame = time + del;
 
-        if(_frame < _frames){
+        if(_frame < _frames)
+        {
             _frame++;
             return true;
-        } else {
+        } else
             return false;
-        }
 
-    } else {
+    }
+    else
+    {
         return true;
     }
 }
@@ -200,16 +188,14 @@ void HT16K33Disp::begin_scroll_loop(int times=-1){
 
 // returns true if there's more loops to go
 bool HT16K33Disp::loop_scroll_string(unsigned long time, char * string, int show_delay = 0, int scroll_delay = 0){
-    if(!_loop_running){
-        if(_loop_times == 0){
+    if(!_loop_running)
+    {
+        if(_loop_times == 0)
             return false;
-        }
-        if(_loop_times == -1 || _loop_times > 0){
+        if(_loop_times == -1 || _loop_times > 0)
             begin_scroll_string(string, show_delay, scroll_delay);
-        }
-        if(_loop_times > 0){
+        if(_loop_times > 0)
             _loop_times--;
-        }
     }
     _loop_running = step_scroll_string(time);
     return true;
