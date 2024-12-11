@@ -44,8 +44,10 @@ void HT16K33Disp::write(byte digit, unsigned int data){
 }
 
 // void HT16K33Disp::segments_test(){
-//     for(byte i = 0; i < _num_digits; i++)
+//     for(byte i = 0; i < _num_digits; i++){
 //         write(i, (uint16_t) -1);
+//         // write(_num_digits-i, (uint16_t) -1);
+//     }
 // }
 
 void HT16K33Disp::clear(){
@@ -166,13 +168,13 @@ bool HT16K33Disp::step_scroll_string(unsigned long time){
             show_string(_string, true);
         } else {
             simple_show_string(_string + _scrollpos);
-        }
 
-        if(_frame < _frames - 1){
-            _scrollpos++;
-
-            if(*(_string + _scrollpos) == '.')
+            if(_frame < _frames - 1){
                 _scrollpos++;
+
+                if(*(_string + _scrollpos) == '.')
+                    _scrollpos++;
+            }
         }
 
         int del = (_frame == 0) || (_frame == _frames - 1) ? _show_delay : _scroll_delay;
@@ -199,12 +201,15 @@ void HT16K33Disp::begin_scroll_loop(int times=-1){
 // returns true if there's more loops to go
 bool HT16K33Disp::loop_scroll_string(unsigned long time, char * string, int show_delay = 0, int scroll_delay = 0){
     if(!_loop_running){
-        if(_loop_times == 0)
+        if(_loop_times == 0){
             return false;
-        if(_loop_times == -1 || _loop_times > 0)
+        }
+        if(_loop_times == -1 || _loop_times > 0){
             begin_scroll_string(string, show_delay, scroll_delay);
-        if(_loop_times > 0)
+        }
+        if(_loop_times > 0){
             _loop_times--;
+        }
     }
     _loop_running = step_scroll_string(time);
     return true;
